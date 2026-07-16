@@ -1,0 +1,5 @@
+# Home Assistant's database, keys, configuration, and gateway token are local state.
+config/*
+!config/.gitkeep
+secrets/*
+!secrets/.gitkeep

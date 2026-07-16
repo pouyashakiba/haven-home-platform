@@ -1,0 +1,32 @@
+# Compose this file with docker-compose.yml. It adds the open-source
+# Home Assistant Container and switches Haven's gateway to live mode.
+services:
+  homeassistant:
+    container_name: haven-homeassistant
+    image: ghcr.io/home-assistant/home-assistant:stable
+    restart: unless-stopped
+    privileged: true
+    network_mode: host
+    environment:
+      TZ: ${TZ:-America/New_York}
+    volumes:
+      - ./home-assistant/config:/config
+      - /etc/localtime:/etc/localtime:ro
+      - /run/dbus:/run/dbus:ro
+
+  gateway:
+    depends_on:
+      homeassistant:
+        condition: service_started
+    environment:
+      AUTOMATION_MODE: live
+      HA_URL: http://host.docker.internal:8123
+      # Keep the access token out of the container environment and image.
+      HA_TOKEN: ""
+      HA_TOKEN_FILE: /run/secrets/home_assistant_token
+    secrets:
+      - home_assistant_token
+
+secrets:
+  home_assistant_token:
+    file: ${HA_TOKEN_FILE:-./home-assistant/secrets/haven_gateway_token}

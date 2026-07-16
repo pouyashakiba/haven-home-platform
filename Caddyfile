@@ -1,0 +1,22 @@
+{$HAVEN_HOST:haven.home.arpa} {
+  tls internal
+  encode zstd gzip
+
+  handle /api/v1/* {
+    reverse_proxy gateway:8787 {
+      header_up X-Haven-Proxy-Key {$HAVEN_PROXY_KEY}
+      header_up X-Forwarded-Host {host}
+    }
+  }
+
+  handle {
+    reverse_proxy web:3000
+  }
+
+  header {
+    Strict-Transport-Security "max-age=31536000"
+    X-Content-Type-Options "nosniff"
+    Referrer-Policy "same-origin"
+    Permissions-Policy "camera=(), microphone=(), geolocation=()"
+  }
+}

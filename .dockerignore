@@ -1,0 +1,13 @@
+node_modules
+dist
+build
+.tmp
+.wrangler
+.git
+.env
+.env.*
+!.env.example
+*.log
+tsconfig.tsbuildinfo
+home-assistant/config
+home-assistant/secrets

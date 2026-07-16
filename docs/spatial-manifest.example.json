@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "model": {
+    "url": "/models/oakwood-house.glb",
+    "sha256": "replace-after-export",
+    "units": "meters",
+    "upAxis": "Y"
+  },
+  "floors": [
+    {
+      "id": "ground",
+      "name": "Ground floor",
+      "modelNode": "Floor_Ground"
+    }
+  ],
+  "anchors": [
+    {
+      "id": "front-door",
+      "kind": "door",
+      "floorId": "ground",
+      "binding": {
+        "deviceId": "replace-with-ha-device-id",
+        "entityIds": [
+          "binary_sensor.front_door",
+          "lock.front_door"
+        ]
+      },
+      "position": [-4.8, 1.05, 4.45],
+      "rotation": [0, 0, 0, 1],
+      "modelNode": "Door_Front",
+      "hitRadius": 0.45,
+      "focus": {
+        "cameraPosition": [-7.2, 4.4, 8.1],
+        "target": [-4.6, 1.2, 3.9],
+        "fov": 34
+      },
+      "animation": {
+        "property": "rotation",
+        "closed": [0, 0, 0],
+        "open": [0, -1.22, 0]
+      }
+    },
+    {
+      "id": "living-light",
+      "kind": "device",
+      "floorId": "ground",
+      "binding": {
+        "entityIds": ["light.living_room"]
+      },
+      "position": [-3.1, 2.25, -1.1],
+      "rotation": [0, 0, 0, 1],
+      "hitRadius": 0.4,
+      "focus": {
+        "cameraPosition": [-7.4, 5.8, 6.5],
+        "target": [-3.1, 1.1, -1.1]
+      }
+    }
+  ]
+}
