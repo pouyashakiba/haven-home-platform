@@ -73,6 +73,10 @@ For the complete Home Assistant + Haven installation, follow [docs/LINUX-INSTALL
 
 5. Open `https://haven.home.arpa` and put the browser into kiosk/full-screen mode.
 
+   For a quick LAN test before local DNS and the tablet certificate are configured,
+   open `http://SERVER_LAN_IP:8080` instead. This is Haven's temporary HTTP
+   commissioning endpoint; Home Assistant remains at `http://SERVER_LAN_IP:8123`.
+
 ## Connect Home Assistant
 
 Edit `.env` on the Linux server:

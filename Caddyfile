@@ -1,5 +1,4 @@
-{$HAVEN_HOST:haven.home.arpa} {
-  tls internal
+(haven) {
   encode zstd gzip
 
   handle /api/v1/* {
@@ -19,4 +18,16 @@
     Referrer-Policy "same-origin"
     Permissions-Policy "camera=(), microphone=(), geolocation=()"
   }
+}
+
+{$HAVEN_HOST:haven.home.arpa} {
+  tls internal
+  import haven
+}
+
+# Temporary local-LAN access for initial commissioning. It deliberately uses a
+# dedicated port so Home Assistant can remain on :8123 and the HTTPS hostname
+# route above remains available for the final tablet setup.
+:8080 {
+  import haven
 }

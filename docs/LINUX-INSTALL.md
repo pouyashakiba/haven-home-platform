@@ -98,6 +98,7 @@ If UFW is enabled, allow the local subnet, replacing the example subnet with you
 
 ```bash
 sudo ufw allow from 192.168.1.0/24 to any port 8123 proto tcp
+sudo ufw allow from 192.168.1.0/24 to any port 8080 proto tcp
 sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
 ```
@@ -176,6 +177,19 @@ SERVER_LAN_IP  haven.home.arpa
 ```
 
 The Home Assistant administration UI remains at `http://SERVER_LAN_IP:8123` on the trusted LAN. Haven itself is served through local HTTPS. Do not create router port-forwarding rules for ports 80, 443, or 8123; use a VPN or Home Assistant Cloud for remote access later.
+
+### Quick IP-only commissioning
+
+Before local DNS and the Caddy certificate are configured on tablets, Haven is
+also available on the trusted LAN at:
+
+```text
+http://SERVER_LAN_IP:8080
+```
+
+This is the Haven 3D panel, not Home Assistant. It is intended only for
+initial local commissioning because it is plain HTTP. Home Assistant's admin
+panel remains at `http://SERVER_LAN_IP:8123`.
 
 ## 6. Zigbee, Z-Wave, and Bluetooth
 
