@@ -40,3 +40,9 @@ test("Caddy forwards the original host and port to the gateway", async () => {
   const caddyfile = await readFile(new URL("../Caddyfile", import.meta.url), "utf8");
   assert.match(caddyfile, /header_up X-Forwarded-Host \{hostport\}/);
 });
+
+test("deployment reloads Caddy after pulling proxy configuration", async () => {
+  const workflow = await readFile(new URL("../.github/workflows/deploy.yml", import.meta.url), "utf8");
+  assert.match(workflow, /caddy validate --config \/etc\/caddy\/Caddyfile/);
+  assert.match(workflow, /docker compose restart caddy/);
+});
