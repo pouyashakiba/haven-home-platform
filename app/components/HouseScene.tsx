@@ -19,8 +19,10 @@ import {
 import { useEffect, useMemo, useRef } from "react";
 import type { HomeDevice } from "../lib/home-data";
 import type { LocalHouseModel } from "../lib/house-model";
+import type { HavenScanBundle } from "../lib/lidar-scan";
 import { roomCentroid, type DeviceAnchor, type SpatialRoom, type Vec3 } from "../lib/spatial-config";
 import { ImportedHouseModel } from "./ImportedHouseModel";
+import { ScannedHomeModel } from "./ScannedHomeModel";
 
 export type CommissioningState =
   | { kind: "idle" }
@@ -33,6 +35,7 @@ export type HouseSceneProps = {
   devices: HomeDevice[];
   onSelect: (id: string) => void;
   importedModel: LocalHouseModel | null;
+  lidarScan: HavenScanBundle | null;
   rooms: SpatialRoom[];
   deviceAnchors: DeviceAnchor[];
   commissioning: CommissioningState;
@@ -1137,7 +1140,9 @@ export default function HouseScene(props: HouseSceneProps) {
         shadow-camera-bottom={-12}
       />
       <Environment preset="apartment" environmentIntensity={0.22} />
-      {props.importedModel ? (
+      {props.lidarScan ? (
+        <ScannedHomeModel scan={props.lidarScan} onSelect={props.onSelect} />
+      ) : props.importedModel ? (
         <>
           <ImportedHouseModel
             model={props.importedModel}
@@ -1166,9 +1171,9 @@ export default function HouseScene(props: HouseSceneProps) {
         frames={1}
       />
       <CameraDirector
-        key={props.importedModel?.id ?? "procedural-home"}
-        focusId={props.importedModel || props.selectedId === "home" ? null : props.selectedId}
-        alertActive={props.importedModel ? false : props.alertActive}
+        key={props.lidarScan?.sessionId ?? props.importedModel?.id ?? "procedural-home"}
+        focusId={props.lidarScan || props.importedModel || props.selectedId === "home" ? null : props.selectedId}
+        alertActive={props.lidarScan || props.importedModel ? false : props.alertActive}
         roomDrawing={Boolean(props.importedModel && props.commissioning.kind === "room")}
       />
     </Canvas>

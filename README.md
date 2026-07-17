@@ -17,6 +17,7 @@ This repository contains the first working milestone, not a finished appliance. 
 - Docker Compose deployment with Caddy local TLS. Home Assistant credentials stay in the gateway, never in the tablet bundle.
 - Optional official open-source Home Assistant Container bundled for a complete single-Linux-server installation.
 - Local GLB house-scan preview with header validation, geometry measurement, automatic centering/scaling, and safe model limits.
+- Native iOS RoomPlan companion with live LiDAR detections, multi-room capture, secure local upload, automatic website return, and smart-object candidates.
 - Sensitive operations such as unlock, disarm, and opening covers are disabled by default.
 
 ## Local development
@@ -43,6 +44,12 @@ bun run typecheck
 bun run build
 bun run test
 ```
+
+## Native LiDAR scanner
+
+The website includes **Scan home** for LiDAR-equipped iPhones and iPad Pros. It opens the native SwiftUI companion, displays Apple RoomPlan detections live, captures one or more named rooms, uploads a semantic floor plan to the local gateway, and returns to Haven automatically. Completed scans remain in the Docker `scan_data` volume and render as a parametric 3D floor plan.
+
+Mac/Xcode setup, signing, physical-phone installation, end-to-end testing, troubleshooting, and a ready-made prompt for a second Codex session are in [docs/IOS-LIDAR-SCANNER.md](docs/IOS-LIDAR-SCANNER.md).
 
 ## Run on the in-house Linux server
 
