@@ -1,0 +1,17 @@
+name: Deploy
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Pull latest and restart services
+        run: |
+          cd /home/textest/haven-home-platform
+          git fetch origin
+          git pull --ff-only origin master
+          docker compose build web gateway
+          docker compose up -d web gateway
