@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { countScanElements, smartObjectSuggestions } from "../app/lib/lidar-scan.ts";
+import { countScanElements, scanSmartObjects, smartObjectSuggestions } from "../app/lib/lidar-scan.ts";
 
 const element = (id, category) => ({
   id,
@@ -8,6 +8,26 @@ const element = (id, category) => ({
   confidence: "high",
   dimensions: [1, 1, 1],
   transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+});
+
+test("prefers confirmed spatial smart objects and keeps their room", () => {
+  const confirmed = structuredClone(scan);
+  confirmed.rooms[0].smartObjects = [{
+    ...element("smart-tv", "smart_tv"),
+    label: "Smart TV",
+    source: "roomplan",
+    sourceElementId: "tv-1",
+  }, {
+    ...element("thermostat", "thermostat"),
+    label: "Thermostat",
+    source: "vision",
+  }];
+  assert.deepEqual(smartObjectSuggestions(confirmed), [
+    { category: "smart_tv", count: 1, deviceKind: "media", label: "Smart TV" },
+    { category: "thermostat", count: 1, deviceKind: "climate", label: "Thermostat" },
+  ]);
+  assert.equal(scanSmartObjects(confirmed)[0].roomName, "Living room");
+  assert.equal(countScanElements(confirmed), 8);
 });
 
 const scan = {

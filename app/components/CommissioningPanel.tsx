@@ -12,6 +12,8 @@ import {
   MapPin,
   Plus,
   Radio,
+  Speaker,
+  ToggleLeft,
   RotateCcw,
   ShieldCheck,
   Thermometer,
@@ -59,7 +61,13 @@ function DeviceIcon({ device }: { device: HomeDevice }) {
               ? Radio
               : device.kind === "shade"
                 ? Blinds
-                : Wind;
+                : device.kind === "media"
+                  ? Speaker
+                  : device.kind === "switch"
+                    ? ToggleLeft
+                    : device.kind === "keypad"
+                      ? ShieldCheck
+                      : Wind;
 
   return <Icon size={19} strokeWidth={1.8} aria-hidden="true" />;
 }

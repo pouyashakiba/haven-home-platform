@@ -3,6 +3,11 @@ import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { mutationIsTrusted } from "./request-trust.mjs";
 import { ScanStore } from "./scan-store.mjs";
+import {
+  emptyHomeAssistantRegistry,
+  enrichEntityWithRegistry,
+  normalizeHomeAssistantRegistry,
+} from "./home-assistant-registry.mjs";
 
 const port = Number(process.env.PORT || 8787);
 const mode = process.env.AUTOMATION_MODE || "demo";
@@ -181,6 +186,8 @@ class HomeAssistantProvider {
   commandId = 1;
   reconnectTimer = null;
   reconnectAttempts = 0;
+  pendingCommands = new Map();
+  registry = emptyHomeAssistantRegistry();
 
   headers() {
     return { Authorization: `Bearer ${haToken}`, "Content-Type": "application/json" };
@@ -200,10 +207,10 @@ class HomeAssistantProvider {
       return [normalized.entityId, normalized];
     }));
     this.config = config;
+    await this.connectWebSocket();
     this.status = "online";
     this.reconnectAttempts = 0;
     emit("provider.status", { status: this.status });
-    this.connectWebSocket();
   }
 
   connectWebSocket() {
@@ -214,29 +221,86 @@ class HomeAssistantProvider {
     const socket = new WebSocket(socketUrl);
     this.socket = socket;
 
-    socket.addEventListener("message", (event) => {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      socket.addEventListener("message", (event) => {
       const message = JSON.parse(event.data);
       if (message.type === "auth_required") {
         socket.send(JSON.stringify({ type: "auth", access_token: haToken }));
       } else if (message.type === "auth_ok") {
-        socket.send(JSON.stringify({ id: this.commandId++, type: "subscribe_events", event_type: "state_changed" }));
+        this.loadRegistries(socket).finally(() => {
+          if (socket.readyState !== 1) {
+            if (!settled) {
+              settled = true;
+              reject(new Error("home_assistant_socket_closed"));
+            }
+            return;
+          }
+          socket.send(JSON.stringify({ id: this.commandId++, type: "subscribe_events", event_type: "state_changed" }));
+          settled = true;
+          resolve();
+        });
+      } else if (message.type === "result") {
+        const pending = this.pendingCommands.get(message.id);
+        if (pending) {
+          this.pendingCommands.delete(message.id);
+          clearTimeout(pending.timeout);
+          if (message.success) pending.resolve(message.result);
+          else pending.reject(new Error(message.error?.code || "home_assistant_command_failed"));
+        }
       } else if (message.type === "event" && message.event?.event_type === "state_changed") {
         this.handleStateChanged(message.event.data);
       } else if (message.type === "auth_invalid") {
         this.status = "offline";
         emit("provider.status", { status: this.status });
+        settled = true;
+        reject(new Error("home_assistant_auth_invalid"));
         socket.close();
       }
-    });
+      });
 
-    socket.addEventListener("close", () => this.scheduleReconnect());
-    socket.addEventListener("error", () => socket.close());
+      socket.addEventListener("close", () => {
+        if (this.socket !== socket) return;
+        if (!settled) {
+          settled = true;
+          reject(new Error("home_assistant_socket_closed"));
+        } else {
+          this.scheduleReconnect();
+        }
+      });
+      socket.addEventListener("error", () => socket.close());
+    });
+  }
+
+  async loadRegistries(socket) {
+    const [areas, devices, entityDisplay] = await Promise.allSettled([
+      this.sendCommand(socket, "config/area_registry/list"),
+      this.sendCommand(socket, "config/device_registry/list"),
+      this.sendCommand(socket, "config/entity_registry/list_for_display"),
+    ]);
+    this.registry = normalizeHomeAssistantRegistry({
+      areas: areas.status === "fulfilled" ? areas.value : [],
+      devices: devices.status === "fulfilled" ? devices.value : [],
+      entityDisplay: entityDisplay.status === "fulfilled" ? entityDisplay.value : {},
+    });
+  }
+
+  sendCommand(socket, type) {
+    const id = this.commandId++;
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.pendingCommands.delete(id);
+        reject(new Error("home_assistant_command_timeout"));
+      }, 8_000);
+      this.pendingCommands.set(id, { resolve, reject, timeout });
+      socket.send(JSON.stringify({ id, type }));
+    });
   }
 
   handleStateChanged(data) {
     if (!data?.new_state) return;
     const previous = this.entities.get(data.entity_id);
-    const entity = normalizeEntity(data.new_state);
+    const entity = enrichEntityWithRegistry(normalizeEntity(data.new_state), this.registry);
     this.entities.set(entity.entityId, entity);
     emit("state.patch", { entity });
 
@@ -295,7 +359,9 @@ class HomeAssistantProvider {
       schemaVersion: 1,
       providerStatus: this.status,
       provider: { name: this.config?.location_name || "Home Assistant", version: this.config?.version },
-      entities: [...this.entities.values()],
+      entities: [...this.entities.values()].map((entity) => enrichEntityWithRegistry(entity, this.registry)),
+      areas: this.registry.areas,
+      devices: this.registry.devices,
       securityAlerts: [...activeAlerts.values()],
       serverTime: new Date().toISOString(),
       snapshotRevision: Date.now(),
@@ -430,6 +496,17 @@ const server = createServer(async (request, response) => {
     if (!session) return sendJson(response, 404, { error: "scan_not_found" });
     const scan = await scanStore.getScan(session.id);
     return sendJson(response, 200, { ...session, scan });
+  }
+  const assignmentMatch = url.pathname.match(/^\/api\/v1\/scans\/([0-9a-f-]{36})\/assignments$/i);
+  if (assignmentMatch && request.method === "PUT") {
+    try {
+      if (!mutationIsTrusted(request, { mode, proxyKey })) return sendJson(response, 403, { error: "untrusted_request" });
+      const body = await readBody(request);
+      const scan = await scanStore.updateAssignment(assignmentMatch[1], body.smartObjectId, body.entityId || null);
+      return sendJson(response, 200, scan);
+    } catch (error) {
+      return sendJson(response, 400, { error: error.message });
+    }
   }
   const scanMatch = url.pathname.match(/^\/api\/v1\/scans\/([0-9a-f-]{36})$/i);
   if (scanMatch && request.method === "GET") {

@@ -17,6 +17,16 @@ export type ScanRoom = {
   openings: ScanElement[];
   floors: ScanElement[];
   objects: ScanElement[];
+  smartObjects?: ScanSmartObject[];
+};
+
+export type ScanSmartObjectCategory = "smart_tv" | "speaker" | "wall_switch" | "keypad" | "smart_blind" | "thermostat";
+
+export type ScanSmartObject = ScanElement & {
+  category: ScanSmartObjectCategory;
+  label: string;
+  source: "roomplan" | "vision";
+  sourceElementId?: string;
 };
 
 export type HavenScanBundle = {
@@ -26,6 +36,7 @@ export type HavenScanBundle = {
   capturedAt: string;
   receivedAt?: string;
   rooms: ScanRoom[];
+  deviceAssignments?: Record<string, string>;
 };
 
 export type ScanSession = {
@@ -78,12 +89,26 @@ export function countScanElements(scan: HavenScanBundle): number {
     + room.windows.length
     + room.openings.length
     + room.floors.length
-    + room.objects.length, 0);
+    + room.objects.length
+    + (room.smartObjects?.length || 0), 0);
+}
+
+export function scanSmartObjects(scan: HavenScanBundle): Array<ScanSmartObject & { roomId: string; roomName: string }> {
+  return scan.rooms.flatMap((room) => (room.smartObjects || []).map((object) => ({
+    ...object,
+    roomId: room.id,
+    roomName: room.name,
+  })));
 }
 
 export function smartObjectSuggestions(scan: HavenScanBundle): SmartObjectSuggestion[] {
   const counts = new Map<string, number>();
+  const confirmed = scanSmartObjects(scan);
+  if (confirmed.length > 0) {
+    for (const object of confirmed) counts.set(object.category, (counts.get(object.category) || 0) + 1);
+  }
   for (const room of scan.rooms) {
+    if (confirmed.length > 0) break;
     for (const object of room.objects) {
       const category = object.category.trim().toLowerCase() || "object";
       counts.set(category, (counts.get(category) || 0) + 1);
@@ -95,6 +120,12 @@ export function smartObjectSuggestions(scan: HavenScanBundle): SmartObjectSugges
 }
 
 function suggestionFor(category: string): Pick<SmartObjectSuggestion, "deviceKind" | "label"> {
+  if (/smart_tv/.test(category)) return { deviceKind: "media", label: "Smart TV" };
+  if (/speaker/.test(category)) return { deviceKind: "media", label: "Speaker" };
+  if (/wall_switch/.test(category)) return { deviceKind: "light", label: "Wall switch" };
+  if (/keypad/.test(category)) return { deviceKind: "security", label: "Keypad" };
+  if (/smart_blind/.test(category)) return { deviceKind: "shade", label: "Smart blind" };
+  if (/thermostat/.test(category)) return { deviceKind: "climate", label: "Thermostat" };
   if (/television|tv|display/.test(category)) return { deviceKind: "media", label: "Smart TV" };
   if (/fireplace/.test(category)) return { deviceKind: "climate", label: "Smart fireplace" };
   if (/window|curtain|blind/.test(category)) return { deviceKind: "shade", label: "Smart shade" };
@@ -102,6 +133,16 @@ function suggestionFor(category: string): Pick<SmartObjectSuggestion, "deviceKin
   if (/lamp|light/.test(category)) return { deviceKind: "light", label: "Smart light" };
   if (/air.?conditioner|radiator|heater/.test(category)) return { deviceKind: "climate", label: "Climate device" };
   return { deviceKind: "other", label: humanizeCategory(category) };
+}
+
+export async function assignScanSmartObject(scanId: string, smartObjectId: string, entityId: string | null): Promise<HavenScanBundle> {
+  const response = await fetch(`/api/v1/scans/${encodeURIComponent(scanId)}/assignments`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ smartObjectId, entityId }),
+  });
+  if (!response.ok) throw new Error(await apiError(response, "Could not save the device assignment."));
+  return response.json() as Promise<HavenScanBundle>;
 }
 
 export function humanizeCategory(category: string): string {

@@ -72,6 +72,24 @@ export class ScanStore {
     return this.#readJson(this.#scanPath(id));
   }
 
+  async updateAssignment(id, smartObjectId, entityId) {
+    assertId(id);
+    const scan = await this.#readJson(this.#scanPath(id));
+    if (!scan) throw new Error("scan_not_found");
+    if (typeof smartObjectId !== "string" || smartObjectId.length > 200) throw new Error("invalid_smart_object_id");
+    const known = scan.rooms.some((room) => room.smartObjects?.some((object) => object.id === smartObjectId));
+    if (!known) throw new Error("smart_object_not_found");
+    if (entityId != null && (typeof entityId !== "string" || !/^[a-z0-9_]+\.[a-z0-9_]+$/i.test(entityId))) {
+      throw new Error("invalid_entity_id");
+    }
+    const deviceAssignments = { ...(scan.deviceAssignments || {}) };
+    if (entityId) deviceAssignments[smartObjectId] = entityId;
+    else delete deviceAssignments[smartObjectId];
+    const updated = { ...scan, deviceAssignments };
+    await this.#writeJson(this.#scanPath(id), updated);
+    return updated;
+  }
+
   async getLatestCompleted() {
     const entries = await readdir(this.directory);
     const sessions = await Promise.all(entries
@@ -121,9 +139,24 @@ export function validateScanBundle(bundle, expectedSessionId) {
       elementCount += room[key].length;
       for (const element of room[key]) validateElement(element);
     }
+    if (room.smartObjects != null) {
+      if (!Array.isArray(room.smartObjects)) throw new Error("invalid_smart_objects");
+      elementCount += room.smartObjects.length;
+      for (const object of room.smartObjects) validateSmartObject(object);
+    }
   }
   if (elementCount > 10_000) throw new Error("scan_too_complex");
   return bundle;
+}
+
+function validateSmartObject(object) {
+  validateElement(object);
+  if (typeof object.label !== "string" || object.label.length > 100) throw new Error("invalid_smart_object_label");
+  if (!['smart_tv', 'speaker', 'wall_switch', 'keypad', 'smart_blind', 'thermostat'].includes(object.category)) {
+    throw new Error("invalid_smart_object_category");
+  }
+  if (!['roomplan', 'vision'].includes(object.source)) throw new Error("invalid_smart_object_source");
+  if (object.sourceElementId != null && typeof object.sourceElementId !== "string") throw new Error("invalid_source_element_id");
 }
 
 function validateElement(element) {

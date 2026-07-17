@@ -20,10 +20,15 @@ final class ScannerViewModel: ObservableObject {
     @Published var roomName = "Living room"
     @Published var liveSummary = DetectionSummary.empty
     @Published var completedRoomCount = 0
+    @Published var currentSmartCandidate: SmartObjectCandidate?
+    @Published var confirmedSmartObjectCount = 0
 
     private weak var captureView: RoomCaptureView?
     private var rooms: [NamedCapturedRoom] = []
     private var pendingRoom: CapturedRoom?
+    private var smartCandidateQueue: [SmartObjectCandidate] = []
+    private var confirmedSmartObjects: [SmartObjectCandidate] = []
+    private var handledSmartObjectKeys = Set<String>()
     private var shouldAutostart = false
 
     var isSupported: Bool { RoomCaptureSession.isSupported }
@@ -46,6 +51,11 @@ final class ScannerViewModel: ObservableObject {
         pendingRoom = nil
         completedRoomCount = 0
         liveSummary = .empty
+        currentSmartCandidate = nil
+        confirmedSmartObjectCount = 0
+        smartCandidateQueue = []
+        confirmedSmartObjects = []
+        handledSmartObjectKeys = []
         roomName = "Living room"
         shouldAutostart = true
         if captureView != nil {
@@ -64,6 +74,8 @@ final class ScannerViewModel: ObservableObject {
     func finishCurrentRoom() {
         guard phase == .scanning else { return }
         phase = .processing
+        currentSmartCandidate = nil
+        smartCandidateQueue = []
         captureView?.captureSession.stop(pauseARSession: false)
     }
 
@@ -74,11 +86,38 @@ final class ScannerViewModel: ObservableObject {
         pendingRoom = nil
         phase = .idle
         liveSummary = .empty
+        currentSmartCandidate = nil
+        smartCandidateQueue = []
+        confirmedSmartObjects = []
+        confirmedSmartObjectCount = 0
+        handledSmartObjectKeys = []
     }
 
     func updateLive(_ room: CapturedRoom) {
         guard phase == .scanning else { return }
         liveSummary = DetectionSummary(room: room)
+    }
+
+    func offerSmartObject(_ candidate: SmartObjectCandidate) {
+        guard phase == .scanning else { return }
+        let key = candidate.sourceElementId.map { "source:\($0):\(candidate.category.rawValue)" }
+            ?? spatialKey(candidate)
+        guard handledSmartObjectKeys.insert(key).inserted else { return }
+        smartCandidateQueue.append(candidate)
+        presentNextSmartCandidate()
+    }
+
+    func addCurrentSmartObject() {
+        guard let candidate = currentSmartCandidate else { return }
+        confirmedSmartObjects.append(candidate)
+        confirmedSmartObjectCount = confirmedSmartObjects.count
+        currentSmartCandidate = nil
+        presentNextSmartCandidate()
+    }
+
+    func ignoreCurrentSmartObject() {
+        currentSmartCandidate = nil
+        presentNextSmartCandidate()
     }
 
     func didProcess(_ room: CapturedRoom) {
@@ -93,6 +132,7 @@ final class ScannerViewModel: ObservableObject {
     func scanAnotherRoom() {
         commitPendingRoom()
         roomName = "Room \(rooms.count + 1)"
+        resetSmartObjectsForNextRoom()
         startCapture()
     }
 
@@ -108,9 +148,32 @@ final class ScannerViewModel: ObservableObject {
     private func commitPendingRoom() {
         guard let pendingRoom else { return }
         let cleanName = roomName.trimmingCharacters(in: .whitespacesAndNewlines)
-        rooms.append(NamedCapturedRoom(name: cleanName.isEmpty ? "Room \(rooms.count + 1)" : cleanName, room: pendingRoom))
+        rooms.append(NamedCapturedRoom(
+            name: cleanName.isEmpty ? "Room \(rooms.count + 1)" : cleanName,
+            room: pendingRoom,
+            smartObjects: confirmedSmartObjects
+        ))
         self.pendingRoom = nil
         completedRoomCount = rooms.count
+    }
+
+    private func presentNextSmartCandidate() {
+        guard currentSmartCandidate == nil, !smartCandidateQueue.isEmpty else { return }
+        currentSmartCandidate = smartCandidateQueue.removeFirst()
+    }
+
+    private func resetSmartObjectsForNextRoom() {
+        currentSmartCandidate = nil
+        smartCandidateQueue = []
+        confirmedSmartObjects = []
+        confirmedSmartObjectCount = 0
+        handledSmartObjectKeys = []
+    }
+
+    private func spatialKey(_ candidate: SmartObjectCandidate) -> String {
+        let position = candidate.position
+        let cell = [position.x, position.y, position.z].map { Int(($0 / 0.35).rounded()) }
+        return "vision:\(candidate.category.rawValue):\(cell[0]):\(cell[1]):\(cell[2])"
     }
 
     private func upload() async {

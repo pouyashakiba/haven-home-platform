@@ -45,6 +45,7 @@ private extension URLComponents {
 struct NamedCapturedRoom {
     let name: String
     let room: CapturedRoom
+    let smartObjects: [SmartObjectCandidate]
 }
 
 struct HavenScanBundle: Codable {
@@ -73,6 +74,7 @@ struct HavenScanRoom: Codable {
     let openings: [HavenScanElement]
     let floors: [HavenScanElement]
     let objects: [HavenScanElement]
+    let smartObjects: [HavenSmartObject]
 
     init(index: Int, namedRoom: NamedCapturedRoom) {
         id = "room-\(index + 1)"
@@ -83,6 +85,29 @@ struct HavenScanRoom: Codable {
         openings = namedRoom.room.openings.map(HavenScanElement.init)
         floors = namedRoom.room.floors.map(HavenScanElement.init)
         objects = namedRoom.room.objects.map(HavenScanElement.init)
+        smartObjects = namedRoom.smartObjects.map(HavenSmartObject.init)
+    }
+}
+
+struct HavenSmartObject: Codable {
+    let id: String
+    let category: String
+    let label: String
+    let confidence: String
+    let dimensions: [Float]
+    let transform: [Float]
+    let source: String
+    let sourceElementId: String?
+
+    init(candidate: SmartObjectCandidate) {
+        id = candidate.id
+        category = candidate.category.rawValue
+        label = candidate.category.title
+        confidence = candidate.scanConfidence
+        dimensions = candidate.dimensions
+        transform = candidate.transform
+        source = candidate.source.rawValue
+        sourceElementId = candidate.sourceElementId
     }
 }
 
