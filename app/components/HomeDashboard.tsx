@@ -61,6 +61,15 @@ import {
   type RuntimeProviderStatus,
 } from "../lib/local-gateway";
 import {
+  countScanElements,
+  createLidarScanSession,
+  loadLatestLidarScan,
+  loadLidarScanSession,
+  smartObjectSuggestions,
+  type HavenScanBundle,
+  type ScanSession,
+} from "../lib/lidar-scan";
+import {
   createSpatialStorageKey,
   findRoomForPosition,
   normalizeRoomName,
@@ -195,6 +204,11 @@ export function HomeDashboard() {
   const [showImportedModel, setShowImportedModel] = useState(false);
   const [modelImporting, setModelImporting] = useState(false);
   const [modelImportError, setModelImportError] = useState<string | null>(null);
+  const [lidarScan, setLidarScan] = useState<HavenScanBundle | null>(null);
+  const [showLidarScan, setShowLidarScan] = useState(false);
+  const [scanSession, setScanSession] = useState<ScanSession | null>(null);
+  const [scanLoading, setScanLoading] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
   const [spatialRooms, setSpatialRooms] = useState<SpatialRoom[]>([]);
   const [deviceAnchors, setDeviceAnchors] = useState<DeviceAnchor[]>([]);
   const [commissioningMode, setCommissioningMode] = useState<CommissioningMode>({ kind: "idle" });
@@ -211,6 +225,63 @@ export function HomeDashboard() {
     const timer = window.setInterval(() => setNow(new Date()), 30_000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const scanId = url.searchParams.get("scan");
+    if (!scanId) {
+      if (usesLocalGateway) {
+        loadLatestLidarScan().then((session) => {
+          if (session?.status === "complete" && session.scan) {
+            setScanSession(session);
+            setLidarScan(session.scan);
+            setShowLidarScan(true);
+          }
+        }).catch(() => undefined);
+      }
+      return;
+    }
+    let active = true;
+    setScanLoading(true);
+    loadLidarScanSession(scanId)
+      .then((session) => {
+        if (!active) return;
+        setScanSession(session);
+        if (session.status === "complete" && session.scan) {
+          setLidarScan(session.scan);
+          setShowLidarScan(true);
+          setShowImportedModel(false);
+          setActiveNav("Home");
+          setToast(`${session.scan.rooms.length} rooms received from Haven Scanner`);
+        } else {
+          setScanError(session.status === "expired" ? "This scan link expired. Start a new scan." : "The phone is still finishing this scan.");
+        }
+      })
+      .catch((error) => active && setScanError(error instanceof Error ? error.message : "The scan could not be loaded."))
+      .finally(() => active && setScanLoading(false));
+    url.searchParams.delete("scan");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (scanSession?.status !== "waiting") return;
+    const timer = window.setInterval(() => {
+      loadLidarScanSession(scanSession.id).then((session) => {
+        setScanSession(session);
+        if (session.status === "complete" && session.scan) {
+          setLidarScan(session.scan);
+          setShowLidarScan(true);
+          setShowImportedModel(false);
+          setScanError(null);
+          setToast(`${session.scan.rooms.length} rooms received from Haven Scanner`);
+        }
+      }).catch(() => undefined);
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [scanSession?.id, scanSession?.status]);
 
   useEffect(() => {
     if (!toast) return;
@@ -461,6 +532,7 @@ export function HomeDashboard() {
       }
       setHouseModel(result.model);
       setShowImportedModel(true);
+      setShowLidarScan(false);
       setSelectedId(null);
       setActiveNav("Home");
       setToast(result.warning ?? `${result.model.name} is ready in the 3D view`);
@@ -471,6 +543,29 @@ export function HomeDashboard() {
       setToast(message);
     } finally {
       if (requestId === modelImportRequest.current) setModelImporting(false);
+    }
+  }
+
+  async function startLidarScan() {
+    if (!usesLocalGateway) {
+      setScanError("LiDAR handoff needs the local Haven gateway.");
+      setActiveNav("Settings");
+      return;
+    }
+    setScanLoading(true);
+    setScanError(null);
+    try {
+      const session = await createLidarScanSession();
+      setScanSession(session);
+      if (!session.deepLink) throw new Error("The scanner link was not created.");
+      window.location.assign(session.deepLink);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "The scanner could not be opened.";
+      setScanError(message);
+      setToast(message);
+      setActiveNav("Settings");
+    } finally {
+      setScanLoading(false);
     }
   }
 
@@ -491,6 +586,7 @@ export function HomeDashboard() {
       return;
     }
     setShowImportedModel(true);
+    setShowLidarScan(false);
   }
 
   function startRoomDrawing() {
@@ -702,10 +798,23 @@ export function HomeDashboard() {
         <section className="house-card" aria-label="Interactive 3D home">
           <div className="scene-topbar">
             <div>
-              <span className="scene-kicker">{showImportedModel && houseModel ? houseModel.name : "Oakwood House"}</span>
-              <h2>{showImportedModel && houseModel ? "Imported scan" : selectedDevice ? selectedDevice.room : selectedId ? "Room focus" : "Whole home"}</h2>
+              <span className="scene-kicker">{showLidarScan && lidarScan ? "RoomPlan LiDAR scan" : showImportedModel && houseModel ? houseModel.name : "Oakwood House"}</span>
+              <h2>{showLidarScan && lidarScan ? `${lidarScan.rooms.length} detected rooms` : showImportedModel && houseModel ? "Imported scan" : selectedDevice ? selectedDevice.room : selectedId ? "Room focus" : "Whole home"}</h2>
             </div>
             <div className="scene-actions">
+              <button className="scene-action scan-home-action" onClick={startLidarScan} disabled={scanLoading}>
+                <ScanLine size={18} />
+                <span>{scanLoading ? "Opening…" : "Scan home"}</span>
+              </button>
+              {lidarScan && (
+                <button className={`scene-action ${showLidarScan ? "is-active" : ""}`} onClick={() => {
+                  setShowLidarScan((current) => !current);
+                  setShowImportedModel(false);
+                }}>
+                  <Layers3 size={18} />
+                  <span>{showLidarScan ? "Demo" : "LiDAR"}</span>
+                </button>
+              )}
               {houseModel && (
                 <button className="scene-action" onClick={toggleHouseModel}>
                   <House size={18} />
@@ -732,12 +841,13 @@ export function HomeDashboard() {
             </div>
           </div>
 
-          <div className={`scene-viewport ${showImportedModel ? "has-imported-model" : ""}`}>
+          <div className={`scene-viewport ${showImportedModel || showLidarScan ? "has-imported-model" : ""}`}>
             <HouseScene
               selectedId={selectedId}
               alertActive={alertActive}
               motionPulse={motionPulse}
               importedModel={showImportedModel ? houseModel : null}
+              lidarScan={showLidarScan ? lidarScan : null}
               devices={mappedDevices}
               rooms={spatialRooms}
               deviceAnchors={deviceAnchors}
@@ -760,6 +870,12 @@ export function HomeDashboard() {
                       : `${spatialRooms.length} rooms · ${deviceAnchors.length} devices placed`}
                 </span>
                 {!commissioningOpen && <button onClick={openCommissioning}>Set up map</button>}
+              </div>
+            )}
+            {showLidarScan && lidarScan && (
+              <div className="scan-scene-note" role="status">
+                <ScanLine size={15} />
+                <span>{countScanElements(lidarScan)} surfaces &amp; objects · {smartObjectSuggestions(lidarScan).length} smart candidates</span>
               </div>
             )}
             <div className="home-vitals" aria-label="Whole-home summary">
@@ -839,6 +955,13 @@ export function HomeDashboard() {
             roomCount={spatialRooms.length}
             anchorCount={deviceAnchors.length}
             onStartCommissioning={openCommissioning}
+            lidarScan={lidarScan}
+            showLidarScan={showLidarScan}
+            scanSession={scanSession}
+            scanLoading={scanLoading}
+            scanError={scanError}
+            onStartScan={startLidarScan}
+            onShowLidarScan={setShowLidarScan}
           />
         ) : (
           <DeviceBrowser
@@ -1176,6 +1299,13 @@ function SetupPanel({
   roomCount,
   anchorCount,
   onStartCommissioning,
+  lidarScan,
+  showLidarScan,
+  scanSession,
+  scanLoading,
+  scanError,
+  onStartScan,
+  onShowLidarScan,
 }: {
   providerStatus: RuntimeProviderStatus;
   houseModel: LocalHouseModel | null;
@@ -1188,8 +1318,16 @@ function SetupPanel({
   roomCount: number;
   anchorCount: number;
   onStartCommissioning: () => void;
+  lidarScan: HavenScanBundle | null;
+  showLidarScan: boolean;
+  scanSession: ScanSession | null;
+  scanLoading: boolean;
+  scanError: string | null;
+  onStartScan: () => void;
+  onShowLidarScan: (show: boolean) => void;
 }) {
   const live = providerStatus === "online";
+  const suggestions = lidarScan ? smartObjectSuggestions(lidarScan) : [];
   return (
     <div className="feature-panel setup-panel">
       <div className="panel-heading"><div><span className="panel-kicker">Local-first</span><h2>System setup</h2></div><span className="feature-icon"><Settings size={20} /></span></div>
@@ -1198,6 +1336,43 @@ function SetupPanel({
         <div><strong>Haven gateway</strong><small>{live ? "Home Assistant · local server" : providerStatus === "demo" ? "Demo provider · this tablet" : "Waiting for local server"}</small></div>
         <span className={`demo-pill ${live ? "is-live" : ""}`}>{live ? "LIVE" : providerStatus.toUpperCase()}</span>
       </div>
+
+      <section className="lidar-scan-section" aria-labelledby="lidar-scan-title">
+        <div className="lidar-scan-heading">
+          <span className="lidar-scan-icon"><ScanLine size={21} /></span>
+          <div><span>iPhone &amp; iPad Pro</span><h3 id="lidar-scan-title">Scan with LiDAR</h3></div>
+          <span className="local-only-pill">ROOMPLAN</span>
+        </div>
+        <p>Open the focused Haven Scanner app, see every wall and object appear live, then return here automatically.</p>
+        {lidarScan ? (
+          <div className="scan-result-card">
+            <div className="scan-result-metrics">
+              <div><strong>{lidarScan.rooms.length}</strong><span>rooms</span></div>
+              <div><strong>{countScanElements(lidarScan)}</strong><span>detections</span></div>
+              <div><strong>{suggestions.length}</strong><span>smart candidates</span></div>
+            </div>
+            {suggestions.length > 0 && (
+              <div className="smart-candidate-list" aria-label="Detected smart object candidates">
+                {suggestions.slice(0, 4).map((suggestion) => (
+                  <span key={suggestion.category}><Sparkles size={12} /> {suggestion.label} · {suggestion.count}</span>
+                ))}
+              </div>
+            )}
+            <div className="scan-result-actions">
+              <button onClick={() => onShowLidarScan(!showLidarScan)}>{showLidarScan ? "Show demo" : "View floor plan"}</button>
+              <button className="is-primary" onClick={onStartScan}>Scan again</button>
+            </div>
+          </div>
+        ) : (
+          <button type="button" className="lidar-scan-button" onClick={onStartScan} disabled={scanLoading}>
+            <span><ScanLine size={20} /></span>
+            <span><strong>{scanLoading ? "Preparing scanner…" : "Start LiDAR scan"}</strong><small>Opens Haven Scanner on this device</small></span>
+            <ChevronRight size={18} />
+          </button>
+        )}
+        {scanSession?.status === "waiting" && <p className="scan-status-note" role="status"><span /> Waiting for the phone to finish and upload…</p>}
+        {scanError && <p className="model-import-error" role="alert">{scanError}</p>}
+      </section>
 
       <section className="model-import-section" aria-labelledby="model-import-title">
         <div className="model-import-heading">
@@ -1249,7 +1424,7 @@ function SetupPanel({
       <div className="setup-steps">
         <div className="is-complete"><span><Check size={15} /></span><p><strong>Interface ready</strong><small>Tablet layout and spatial controls</small></p></div>
         <div className={live ? "is-complete" : ""}><span>{live ? <Check size={15} /> : 2}</span><p><strong>Connect Home Assistant</strong><small>Credential stays inside the gateway</small></p></div>
-        <div className={houseModel ? "is-complete" : ""}><span>{houseModel ? <Check size={15} /> : 3}</span><p><strong>Import house scan</strong><small>Polycam GLB · RoomPlan needs conversion</small></p></div>
+        <div className={lidarScan || houseModel ? "is-complete" : ""}><span>{lidarScan || houseModel ? <Check size={15} /> : 3}</span><p><strong>Capture the floor plan</strong><small>{lidarScan ? `${lidarScan.rooms.length} rooms from LiDAR` : "RoomPlan scan or Polycam GLB"}</small></p></div>
         <div className={anchorCount > 0 ? "is-complete" : ""}><span>{anchorCount > 0 ? <Check size={15} /> : 4}</span><p><strong>Map rooms &amp; devices</strong><small>{roomCount ? `${roomCount} rooms · ${anchorCount} placed` : "Draw boundaries, then tap exact device locations"}</small></p></div>
       </div>
       <a className="primary-action" href="http://homeassistant.local:8123" target="_blank" rel="noreferrer"><Radio size={18} /> {live ? "Open Home Assistant" : "Start Home Assistant setup"}</a>

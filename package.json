@@ -12,7 +12,7 @@
     "start": "vinext start",
     "gateway": "node gateway/server.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "bun run build && node --experimental-strip-types --test tests/house-model.test.mjs tests/local-gateway.test.mjs tests/spatial-config.test.mjs tests/rendered-html.test.mjs",
+    "test": "bun run build && node --experimental-strip-types --test tests/house-model.test.mjs tests/local-gateway.test.mjs tests/spatial-config.test.mjs tests/lidar-scan.test.mjs tests/scan-store.test.mjs tests/rendered-html.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate"
   },

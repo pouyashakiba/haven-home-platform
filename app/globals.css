@@ -1912,6 +1912,101 @@ button:active {
 .gateway-card strong { font-size: 12px; }
 .gateway-card small { color: var(--muted-2); font-size: 9px; }
 
+.lidar-scan-section {
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid rgba(112, 224, 190, 0.18);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 0 0, rgba(112, 224, 190, 0.11), transparent 42%),
+    rgba(255, 255, 255, 0.02);
+}
+
+.lidar-scan-heading {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.lidar-scan-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  color: #082019;
+  background: var(--brand);
+  box-shadow: 0 0 0 7px rgba(112, 224, 190, 0.055);
+}
+
+.lidar-scan-heading > div { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.lidar-scan-heading > div > span { color: var(--muted-2); font-size: 8px; font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; }
+.lidar-scan-heading h3 { margin: 0; font-size: 13px; }
+.lidar-scan-section > p { margin: 11px 2px 12px; color: var(--muted); font-size: 9px; line-height: 1.5; }
+
+.lidar-scan-button {
+  width: 100%;
+  min-height: 64px;
+  padding: 8px 10px;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(112, 224, 190, 0.25);
+  border-radius: 15px;
+  color: var(--text);
+  background: rgba(112, 224, 190, 0.075);
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: border-color 180ms ease, background-color 180ms ease, transform 180ms ease;
+}
+
+.lidar-scan-button:hover:not(:disabled) { border-color: rgba(112, 224, 190, 0.5); background: rgba(112, 224, 190, 0.12); }
+.lidar-scan-button:active:not(:disabled) { transform: scale(0.985); }
+.lidar-scan-button:disabled { cursor: wait; opacity: 0.65; }
+.lidar-scan-button > span:first-child { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; color: var(--brand); background: var(--brand-soft); }
+.lidar-scan-button > span:nth-child(2) { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.lidar-scan-button strong { font-size: 11px; }
+.lidar-scan-button small { color: var(--muted-2); font-size: 9px; }
+.lidar-scan-button > svg { color: var(--brand); }
+.scan-status-note { display: flex; align-items: center; gap: 7px; color: var(--brand) !important; }
+.scan-status-note > span { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 5px rgba(112, 224, 190, 0.08); animation: beacon 1.5s ease-in-out infinite; }
+
+.scan-result-card { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.scan-result-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.scan-result-metrics > div { min-width: 0; min-height: 58px; padding: 9px; display: flex; flex-direction: column; justify-content: center; gap: 2px; border: 1px solid var(--border); border-radius: 13px; background: rgba(255, 255, 255, 0.018); }
+.scan-result-metrics strong { color: var(--brand); font-size: 16px; }
+.scan-result-metrics span { overflow: hidden; color: var(--muted-2); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.smart-candidate-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.smart-candidate-list span { min-height: 28px; padding: 0 8px; display: inline-flex; align-items: center; gap: 5px; border-radius: 9px; color: var(--muted); background: var(--surface-3); font-size: 8px; }
+.smart-candidate-list svg { color: var(--brand); }
+.scan-result-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.scan-result-actions button { min-height: 44px; border: 1px solid var(--border-strong); border-radius: 12px; color: var(--text); background: var(--surface-3); font: inherit; font-size: 9px; font-weight: 750; cursor: pointer; }
+.scan-result-actions button.is-primary { border-color: transparent; color: #082019; background: var(--brand); }
+.lidar-scan-button:focus-visible, .scan-result-actions button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+.scan-scene-note {
+  position: absolute;
+  top: 19px;
+  left: 20px;
+  z-index: 5;
+  min-height: 34px;
+  padding: 0 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(112, 224, 190, 0.2);
+  border-radius: 11px;
+  color: var(--muted);
+  background: rgba(10, 20, 18, 0.82);
+  backdrop-filter: blur(14px);
+  font-size: 9px;
+}
+.scan-scene-note svg { color: var(--brand); }
+.scene-action:disabled { cursor: wait; opacity: 0.55; }
+
 .demo-pill {
   padding: 5px 7px;
   border-radius: 7px;

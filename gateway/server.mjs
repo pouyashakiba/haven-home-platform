@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { ScanStore } from "./scan-store.mjs";
 
 const port = Number(process.env.PORT || 8787);
 const mode = process.env.AUTOMATION_MODE || "demo";
@@ -12,6 +13,8 @@ const haUrl = (
 const haToken = process.env.HA_TOKEN || readSecret(process.env.HA_TOKEN_FILE) || supervisorToken;
 const proxyKey = process.env.HAVEN_PROXY_KEY || readSecret(process.env.HAVEN_PROXY_KEY_FILE);
 const allowSensitiveActions = process.env.ALLOW_SENSITIVE_ACTIONS === "true";
+const scanStore = new ScanStore(process.env.SCAN_STORAGE_DIR || "/tmp/haven-scans");
+await scanStore.initialize();
 
 const subscribers = new Set();
 const commandResults = new Map();
@@ -59,13 +62,13 @@ function mutationIsTrusted(request) {
   }
 }
 
-function readBody(request) {
+function readBody(request, maximumBytes = 64 * 1024) {
   return new Promise((resolve, reject) => {
     const chunks = [];
     let size = 0;
     request.on("data", (chunk) => {
       size += chunk.length;
-      if (size > 64 * 1024) {
+      if (size > maximumBytes) {
         reject(new Error("request_too_large"));
         request.destroy();
         return;
@@ -423,6 +426,51 @@ const server = createServer(async (request, response) => {
       return sendJson(response, result.status === "accepted" ? 202 : 409, result);
     } catch (error) {
       return sendJson(response, 400, { error: error.message });
+    }
+  }
+  if (request.method === "POST" && url.pathname === "/api/v1/scans") {
+    try {
+      if (!mutationIsTrusted(request)) return sendJson(response, 403, { error: "untrusted_request" });
+      const body = await readBody(request);
+      const session = await scanStore.createSession(body);
+      return sendJson(response, 201, session);
+    } catch (error) {
+      return sendJson(response, 400, { error: error.message });
+    }
+  }
+  if (request.method === "GET" && url.pathname === "/api/v1/scans/latest") {
+    const session = await scanStore.getLatestCompleted();
+    if (!session) return sendJson(response, 404, { error: "scan_not_found" });
+    const scan = await scanStore.getScan(session.id);
+    return sendJson(response, 200, { ...session, scan });
+  }
+  const scanMatch = url.pathname.match(/^\/api\/v1\/scans\/([0-9a-f-]{36})$/i);
+  if (scanMatch && request.method === "GET") {
+    try {
+      const session = await scanStore.getSession(scanMatch[1]);
+      if (!session) return sendJson(response, 404, { error: "scan_not_found" });
+      if (session.status !== "complete") return sendJson(response, 200, session);
+      const scan = await scanStore.getScan(scanMatch[1]);
+      return sendJson(response, 200, { ...session, scan });
+    } catch (error) {
+      return sendJson(response, 400, { error: error.message });
+    }
+  }
+  if (scanMatch && request.method === "PUT") {
+    try {
+      const authorization = request.headers.authorization || "";
+      const token = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+      const scan = await readBody(request, 5 * 1024 * 1024);
+      const session = await scanStore.completeSession(scanMatch[1], token, scan);
+      emit("scan.completed", { scanId: session.id, receivedAt: session.receivedAt });
+      return sendJson(response, 200, session);
+    } catch (error) {
+      const status = error.message === "scan_not_found" ? 404
+        : ["invalid_scan_token", "scan_expired"].includes(error.message) ? 403
+          : error.message === "scan_already_complete" ? 409
+          : error.message === "request_too_large" ? 413
+            : 400;
+      return sendJson(response, status, { error: error.message });
     }
   }
   return sendJson(response, 404, { error: "not_found" });

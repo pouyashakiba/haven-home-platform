@@ -34,6 +34,9 @@ services:
       HA_TOKEN: ${HA_TOKEN:-}
       HAVEN_PROXY_KEY: ${HAVEN_PROXY_KEY:?Set HAVEN_PROXY_KEY in .env}
       ALLOW_SENSITIVE_ACTIONS: ${ALLOW_SENSITIVE_ACTIONS:-false}
+      SCAN_STORAGE_DIR: /data/scans
+    volumes:
+      - scan_data:/data
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8787/api/v1/health"]
       interval: 15s
@@ -62,3 +65,4 @@ services:
 volumes:
   caddy_data:
   caddy_config:
+  scan_data:
