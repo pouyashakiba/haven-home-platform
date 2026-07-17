@@ -55,7 +55,9 @@ Before sensitive actions are enabled for customers, add opaque HttpOnly tablet s
 
 The live provider loads `/api/config` and `/api/states`, then keeps one `/api/websocket` connection subscribed to `state_changed`. It normalizes incoming entities, emits state patches, and classifies door/window opening transitions as security alerts. Disconnects use bounded exponential retry with jitter.
 
-The next registry milestone should also request Home Assistant's entity, device, area, and floor registries. Physical placement should bind primarily to stable device IDs while retaining the current entity IDs beneath each binding.
+The live provider joins Home Assistant state data with the entity, device, and area registries over the authenticated WebSocket API. Haven exposes stable device IDs, entity IDs, area names, integrations, manufacturers, and models to commissioning while keeping the Home Assistant credential inside the gateway. Spatial assignments currently target the controllable entity and retain its device ID metadata.
+
+The scanner stores confirmed smart-object category, confidence, dimensions, and the complete AR transform beside each RoomPlan room. The web renderer substitutes lightweight symbolic geometry for smart TVs, speakers, switches, keypads, blinds, and thermostats. Device assignments are written back into the server-side scan so every tablet sees the same mapping.
 
 ## Spatial data
 

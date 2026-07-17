@@ -53,3 +53,26 @@ test("rejects callback URLs that leave the home server origin", async (t) => {
     /callback_origin_mismatch/,
   );
 });
+
+test("persists a Home Assistant assignment for a confirmed spatial object", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "haven-scans-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const store = new ScanStore(directory);
+  await store.initialize();
+  const session = await store.createSession({ serverUrl: "http://10.0.0.40:8080", callbackUrl: "http://10.0.0.40:8080/" });
+  const token = new URL(session.deepLink).searchParams.get("token");
+  const scan = bundle(session.id);
+  scan.rooms[0].smartObjects = [{
+    ...scan.rooms[0].walls[0],
+    id: "smart-tv-1",
+    category: "smart_tv",
+    label: "Smart TV",
+    source: "roomplan",
+    sourceElementId: "wall-1",
+  }];
+  await store.completeSession(session.id, token, scan);
+  const updated = await store.updateAssignment(session.id, "smart-tv-1", "media_player.living_tv");
+  assert.equal(updated.deviceAssignments["smart-tv-1"], "media_player.living_tv");
+  const removed = await store.updateAssignment(session.id, "smart-tv-1", null);
+  assert.deepEqual(removed.deviceAssignments, {});
+});

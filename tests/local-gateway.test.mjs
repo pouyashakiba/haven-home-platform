@@ -33,6 +33,10 @@ test("maps supported Home Assistant domains and device classes to Haven kinds", 
     [entity({ entityId: "binary_sensor.office_occupancy", domain: "binary_sensor", deviceClass: "occupancy" }), "motion"],
     [entity({ entityId: "cover.bedroom", domain: "cover", state: "closed" }), "shade"],
     [entity({ entityId: "sensor.air_quality", domain: "sensor", state: "good" }), "sensor"],
+    [entity({ entityId: "media_player.living_tv", domain: "media_player", state: "playing" }), "media"],
+    [entity({ entityId: "switch.wall_dimmer", domain: "switch", state: "on" }), "switch"],
+    [entity({ entityId: "alarm_control_panel.house", domain: "alarm_control_panel", state: "disarmed" }), "keypad"],
+    [entity({ entityId: "fan.bedroom", domain: "fan", state: "off" }), "fan"],
   ];
 
   for (const [input, expectedKind] of cases) {
@@ -42,7 +46,7 @@ test("maps supported Home Assistant domains and device classes to Haven kinds", 
 
 test("omits unsupported Home Assistant domains", () => {
   assert.equal(
-    gatewayEntityToDevice(entity({ entityId: "switch.coffee_machine", domain: "switch" })),
+    gatewayEntityToDevice(entity({ entityId: "automation.good_morning", domain: "automation" })),
     null,
   );
 });
@@ -89,7 +93,7 @@ test("appends each newly discovered supported entity and ignores unsupported one
   const afterSecond = mergeGatewayEntity(afterFirst, secondMotion);
   const afterUnsupported = mergeGatewayEntity(
     afterSecond,
-    entity({ entityId: "switch.coffee_machine", domain: "switch" }),
+    entity({ entityId: "automation.coffee_machine", domain: "automation" }),
   );
 
   assert.deepEqual(afterSecond.map((device) => device.entityId), [
@@ -99,3 +103,20 @@ test("appends each newly discovered supported entity and ignores unsupported one
   assert.deepEqual(afterUnsupported, afterSecond);
 });
 
+test("uses Home Assistant area and hardware metadata in discovered devices", () => {
+  const result = gatewayEntityToDevice(entity({
+    entityId: "media_player.living_tv",
+    domain: "media_player",
+    state: "playing",
+    areaId: "living_room",
+    areaName: "Living room",
+    deviceId: "device-1",
+    platform: "samsungtv",
+    manufacturer: "Samsung",
+    model: "Frame",
+  }));
+  assert.equal(result.room, "Living room");
+  assert.equal(result.kind, "media");
+  assert.equal(result.deviceId, "device-1");
+  assert.match(result.detail, /Samsung · Frame/);
+});

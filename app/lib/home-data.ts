@@ -5,7 +5,11 @@ export type DeviceKind =
   | "camera"
   | "motion"
   | "sensor"
-  | "shade";
+  | "shade"
+  | "media"
+  | "switch"
+  | "keypad"
+  | "fan";
 
 export type HomeDevice = {
   id: string;
@@ -17,6 +21,11 @@ export type HomeDevice = {
   detail: string;
   active: boolean;
   available: boolean;
+  deviceId?: string;
+  areaId?: string;
+  integration?: string;
+  manufacturer?: string;
+  model?: string;
 };
 
 export const demoDevices: HomeDevice[] = [

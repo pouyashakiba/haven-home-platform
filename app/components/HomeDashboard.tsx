@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CommissioningPanel, type CommissioningMode } from "./CommissioningPanel";
+import { ScanDeviceAssignment } from "./ScanDeviceAssignment";
 import { createClientId } from "../lib/client-id.ts";
 import { demoDevices, roomSummary, type DeviceKind, type HomeDevice } from "../lib/home-data";
 import {
@@ -62,6 +63,7 @@ import {
 } from "../lib/local-gateway";
 import {
   countScanElements,
+  assignScanSmartObject,
   createLidarScanSession,
   loadLatestLidarScan,
   loadLidarScanSession,
@@ -172,9 +174,15 @@ function DeviceGlyph({ kind, size = 19 }: { kind: DeviceKind; size?: number }) {
             ? Camera
             : kind === "motion"
               ? ScanLine
-            : kind === "shade"
-              ? Blinds
-              : Wind;
+              : kind === "shade"
+                ? Blinds
+                : kind === "media"
+                  ? Radio
+                  : kind === "switch"
+                    ? Power
+                    : kind === "keypad"
+                      ? BellRing
+                      : Wind;
   return <Icon size={size} strokeWidth={1.8} aria-hidden="true" />;
 }
 
@@ -445,6 +453,13 @@ export function HomeDashboard() {
     }
   }
 
+  async function assignDetectedObject(smartObjectId: string, entityId: string | null) {
+    if (!lidarScan) return;
+    const updated = await assignScanSmartObject(lidarScan.sessionId, smartObjectId, entityId);
+    setLidarScan(updated);
+    setToast(entityId ? "Detected object connected" : "Device assignment removed");
+  }
+
   function chooseMode(mode: ModeId) {
     setActiveMode(mode);
     setToast(`${mode} mode is ready`);
@@ -481,6 +496,15 @@ export function HomeDashboard() {
             active: nextActive,
             state: nextActive ? "Open" : "Closed",
             detail: nextActive ? "100% open" : "0% open",
+          };
+        }
+        if (["media", "switch", "fan"].includes(device.kind)) {
+          const nextActive = !device.active;
+          return {
+            ...device,
+            active: nextActive,
+            state: nextActive ? "On" : "Off",
+            detail: nextActive ? "On just now" : "Off just now",
           };
         }
         return device;
@@ -985,6 +1009,8 @@ export function HomeDashboard() {
             scanError={scanError}
             onStartScan={startLidarScan}
             onShowLidarScan={setShowLidarScan}
+            devices={mappedDevices}
+            onAssignDetectedObject={assignDetectedObject}
           />
         ) : (
           <DeviceBrowser
@@ -1184,7 +1210,8 @@ function DeviceInspector({
   onBack: () => void;
   onToggle: () => void;
 }) {
-  const controllable = device.kind === "light" || device.kind === "shade";
+  const controllable = ["light", "shade", "media", "switch", "fan"].includes(device.kind)
+    && !device.entityId.startsWith("button.");
   return (
     <div className="inspector">
       <button className="back-button" onClick={onBack}><ChevronLeft size={18} /> All devices</button>
@@ -1334,6 +1361,8 @@ function SetupPanel({
   scanError,
   onStartScan,
   onShowLidarScan,
+  devices,
+  onAssignDetectedObject,
 }: {
   providerStatus: RuntimeProviderStatus;
   houseModel: LocalHouseModel | null;
@@ -1353,6 +1382,8 @@ function SetupPanel({
   scanError: string | null;
   onStartScan: () => void;
   onShowLidarScan: (show: boolean) => void;
+  devices: HomeDevice[];
+  onAssignDetectedObject: (smartObjectId: string, entityId: string | null) => Promise<void>;
 }) {
   const live = providerStatus === "online";
   const suggestions = lidarScan ? smartObjectSuggestions(lidarScan) : [];
@@ -1390,6 +1421,7 @@ function SetupPanel({
               <button onClick={() => onShowLidarScan(!showLidarScan)}>{showLidarScan ? "Show demo" : "View floor plan"}</button>
               <button className="is-primary" onClick={onStartScan}>Scan again</button>
             </div>
+            <ScanDeviceAssignment scan={lidarScan} devices={devices} onAssign={onAssignDetectedObject} />
           </div>
         ) : (
           <button type="button" className="lidar-scan-button" onClick={onStartScan} disabled={scanLoading}>

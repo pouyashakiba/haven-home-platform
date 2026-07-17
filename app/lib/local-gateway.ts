@@ -12,6 +12,13 @@ export type GatewayEntity = {
   state: string;
   availability: "available" | "unavailable" | "unknown";
   attributes: Record<string, unknown>;
+  deviceId?: string;
+  deviceName?: string;
+  areaId?: string;
+  areaName?: string;
+  platform?: string;
+  manufacturer?: string;
+  model?: string;
 };
 
 function displayName(entity: GatewayEntity) {
@@ -32,6 +39,10 @@ function deviceKind(entity: GatewayEntity): HomeDevice["kind"] | null {
   if (entity.domain === "lock") return "lock";
   if (entity.domain === "camera") return "camera";
   if (entity.domain === "cover") return "shade";
+  if (entity.domain === "media_player") return "media";
+  if (entity.domain === "switch" || entity.domain === "input_boolean" || entity.domain === "button") return "switch";
+  if (entity.domain === "alarm_control_panel") return "keypad";
+  if (entity.domain === "fan") return "fan";
   if (entity.domain === "sensor") return "sensor";
   if (entity.domain === "binary_sensor") {
     if (entity.deviceClass === "motion" || entity.deviceClass === "occupancy") return "motion";
@@ -60,7 +71,13 @@ export function gatewayEntityToDevice(entity: GatewayEntity): HomeDevice | null 
             ? entity.state !== "off"
             : kind === "camera"
               ? available
-              : false;
+              : kind === "media"
+                ? !["off", "idle", "standby", "unavailable"].includes(entity.state)
+                : kind === "switch" || kind === "fan"
+                  ? entity.state === "on"
+                  : kind === "keypad"
+                    ? entity.state !== "disarmed"
+                    : false;
 
   const state =
     kind === "light"
@@ -71,7 +88,11 @@ export function gatewayEntityToDevice(entity: GatewayEntity): HomeDevice | null 
           ? active ? "Open" : "Closed"
           : kind === "camera"
             ? available ? "Live" : "Offline"
-            : entity.state;
+            : kind === "media"
+              ? active ? "Playing" : "Idle"
+              : kind === "switch" || kind === "fan"
+                ? active ? "On" : "Off"
+                : entity.state;
   const detail =
     kind === "light" && active && brightness !== null
       ? `${brightness}%`
@@ -79,24 +100,31 @@ export function gatewayEntityToDevice(entity: GatewayEntity): HomeDevice | null 
         ? `${position}% open`
         : kind === "motion"
           ? active ? "Movement just detected" : "No current movement"
-          : entity.entityId;
+          : [entity.manufacturer, entity.model, entity.entityId].filter(Boolean).join(" · ");
 
   return {
     id: entity.entityId,
     entityId: entity.entityId,
     name: displayName(entity),
-    room: "Unassigned",
+    room: entity.areaName || "Unassigned",
     kind,
     state,
     detail,
     active,
     available,
+    deviceId: entity.deviceId,
+    areaId: entity.areaId,
+    integration: entity.platform,
+    manufacturer: entity.manufacturer,
+    model: entity.model,
   };
 }
 
 type BootstrapResponse = {
   providerStatus: RuntimeProviderStatus;
   entities: GatewayEntity[];
+  areas?: Array<{ id: string; name: string; floorId?: string }>;
+  devices?: Array<{ id: string; name: string; areaId?: string; manufacturer?: string; model?: string }>;
 };
 
 export const usesLocalGateway = process.env.NEXT_PUBLIC_AUTOMATION_SOURCE === "gateway";
@@ -186,6 +214,20 @@ export function mergeGatewayEntity(devices: HomeDevice[], entity: GatewayEntity)
         available,
         state: active ? "Open" : "Closed",
         detail: Number.isFinite(position) ? `${position}% open` : entity.state,
+      };
+    }
+    if (["media", "switch", "fan", "keypad"].includes(device.kind)) {
+      const active = device.kind === "media"
+        ? !["off", "idle", "standby", "unavailable"].includes(entity.state)
+        : device.kind === "keypad"
+          ? entity.state !== "disarmed"
+          : entity.state === "on";
+      return {
+        ...device,
+        active,
+        available,
+        state: device.kind === "media" ? active ? "Playing" : "Idle" : device.kind === "keypad" ? entity.state : active ? "On" : "Off",
+        detail: entity.entityId,
       };
     }
     if (entity.domain === "binary_sensor") {

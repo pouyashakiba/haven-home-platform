@@ -27,7 +27,13 @@ struct ScannerRootView: View {
             VStack(spacing: 0) {
                 scannerHeader
                 Spacer()
-                if model.phase == .scanning { DetectionTray(model: model) }
+                if model.phase == .scanning {
+                    if let candidate = model.currentSmartCandidate {
+                        SmartObjectConfirmationCard(model: model, candidate: candidate)
+                            .padding(.bottom, 10)
+                    }
+                    DetectionTray(model: model)
+                }
             }
 
             if model.phase == .processing || model.phase == .uploading {
@@ -78,6 +84,7 @@ private struct DetectionTray: View {
                     ForEach(model.liveSummary.objects) { object in
                         CountChip(label: object.name.humanized, count: object.count, highlighted: true)
                     }
+                    CountChip(label: "Smart added", count: model.confirmedSmartObjectCount, highlighted: true)
                 }
             }
 
@@ -92,6 +99,51 @@ private struct DetectionTray: View {
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).stroke(.white.opacity(0.1)))
         .padding(.horizontal, 12).padding(.bottom, 8)
+    }
+}
+
+private struct SmartObjectConfirmationCard: View {
+    @ObservedObject var model: ScannerViewModel
+    let candidate: SmartObjectCandidate
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                Image(systemName: candidate.category.systemImage)
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(.mint)
+                    .frame(width: 46, height: 46)
+                    .background(Color.mint.opacity(0.14), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("SMART OBJECT DETECTED").font(.caption2.weight(.bold)).tracking(1.1).foregroundStyle(.mint)
+                    Text(candidate.category.title).font(.headline).foregroundStyle(.primary)
+                    Text("\(candidate.confidenceLabel) · Add it at this position?").font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) { confirmationButtons }
+                VStack(spacing: 10) { confirmationButtons }
+            }
+        }
+        .padding(16)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).stroke(Color.mint.opacity(0.28)))
+        .padding(.horizontal, 12)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("\(candidate.category.title) detected. Choose whether to add it to the floor plan.")
+    }
+
+    @ViewBuilder
+    private var confirmationButtons: some View {
+        Button("Not this object", action: model.ignoreCurrentSmartObject)
+            .buttonStyle(.bordered)
+            .frame(maxWidth: .infinity, minHeight: 44)
+        Button(action: model.addCurrentSmartObject) {
+            Label("Add to plan", systemImage: "plus.circle.fill")
+                .frame(maxWidth: .infinity, minHeight: 44)
+        }
+        .buttonStyle(.borderedProminent)
     }
 }
 

@@ -17,7 +17,8 @@ This repository contains the first working milestone, not a finished appliance. 
 - Docker Compose deployment with Caddy local TLS. Home Assistant credentials stay in the gateway, never in the tablet bundle.
 - Optional official open-source Home Assistant Container bundled for a complete single-Linux-server installation.
 - Local GLB house-scan preview with header validation, geometry measurement, automatic centering/scaling, and safe model limits.
-- Native iOS RoomPlan companion with live LiDAR detections, multi-room capture, secure local upload, automatic website return, and smart-object candidates.
+- Native iOS RoomPlan companion with live LiDAR detections, Vision-assisted smart-object confirmation, multi-room capture, secure local upload, automatic website return, and persistent 3D device anchors.
+- Home Assistant entity/device/area registry discovery with media players, switches, keypads, fans, covers, climate devices, and hardware metadata available for spatial assignment.
 - Sensitive operations such as unlock, disarm, and opening covers are disabled by default.
 
 ## Local development
@@ -47,7 +48,7 @@ bun run test
 
 ## Native LiDAR scanner
 
-The website includes **Scan home** for LiDAR-equipped iPhones and iPad Pros. It opens the native SwiftUI companion, displays Apple RoomPlan detections live, captures one or more named rooms, uploads a semantic floor plan to the local gateway, and returns to Haven automatically. Completed scans remain in the Docker `scan_data` volume and render as a parametric 3D floor plan.
+The website includes **Scan home** for LiDAR-equipped iPhones and iPad Pros. It opens the native SwiftUI companion, displays Apple RoomPlan detections live, and proposes smart TVs, speakers, wall switches, keypads, blinds, and thermostats for confirmation. Accepted devices retain their LiDAR position and render as symbolic 3D models after upload. Haven then offers compatible Home Assistant entities for each detected object. Completed scans and assignments remain in the Docker `scan_data` volume.
 
 Mac/Xcode setup, signing, physical-phone installation, end-to-end testing, troubleshooting, and a ready-made prompt for a second Codex session are in [docs/IOS-LIDAR-SCANNER.md](docs/IOS-LIDAR-SCANNER.md).
 
