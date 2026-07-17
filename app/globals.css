@@ -2397,7 +2397,7 @@ button:active {
     height: auto;
     min-height: 100dvh;
     display: block;
-    padding: 8px 8px 84px;
+    padding: 8px 8px calc(90px + env(safe-area-inset-bottom));
     overflow: visible;
   }
   .nav-rail { display: none; }
@@ -2443,6 +2443,7 @@ button:active {
     border-radius: 22px;
     padding: 18px 15px;
     overflow: visible;
+    scroll-margin-top: 8px;
   }
   .security-banner {
     position: fixed;
@@ -2479,6 +2480,8 @@ button:active {
     gap: 3px;
     font-size: 8px;
     font-weight: 700;
+    cursor: pointer;
+    touch-action: manipulation;
   }
   .mobile-nav button.is-active { color: var(--brand); background: var(--brand-soft); }
   .toast { bottom: 86px; }
