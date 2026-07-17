@@ -102,6 +102,14 @@ const navigation: Array<{ id: NavId; icon: typeof House }> = [
   { id: "Energy", icon: Zap },
 ];
 
+const mobileNavigation: Array<{ id: NavId; icon: typeof House; label: string }> = [
+  { id: "Home", icon: House, label: "Home" },
+  { id: "Rooms", icon: LayoutGrid, label: "Rooms" },
+  { id: "Climate", icon: Thermometer, label: "Climate" },
+  { id: "Security", icon: ShieldCheck, label: "Security" },
+  { id: "Settings", icon: Settings, label: "Setup" },
+];
+
 const modes: Array<{ id: ModeId; icon: typeof House; note: string }> = [
   { id: "Home", icon: House, note: "Comfort and security" },
   { id: "Away", icon: ShieldCheck, note: "Arm and conserve" },
@@ -216,6 +224,7 @@ export function HomeDashboard() {
   const [newRoomName, setNewRoomName] = useState("");
   const [spatialStorageReady, setSpatialStorageReady] = useState(false);
   const modelImportRequest = useRef(0);
+  const sidePanelRef = useRef<HTMLElement | null>(null);
   const [providerStatus, setProviderStatus] = useState<RuntimeProviderStatus>(
     usesLocalGateway ? "connecting" : "demo",
   );
@@ -424,6 +433,15 @@ export function HomeDashboard() {
     if (id === "Security") {
       setBrowserMode("Devices");
       setFilter("Security");
+    }
+    if (id !== "Home" && window.matchMedia("(max-width: 760px)").matches) {
+      window.requestAnimationFrame(() => {
+        const panel = sidePanelRef.current;
+        if (!panel) return;
+        const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        panel.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+        panel.focus({ preventScroll: true });
+      });
     }
   }
 
@@ -908,7 +926,12 @@ export function HomeDashboard() {
         </section>
       </section>
 
-      <aside className={`side-panel ${alertActive ? "incident-mode" : ""}`} aria-label="Home controls">
+      <aside
+        ref={sidePanelRef}
+        className={`side-panel ${alertActive ? "incident-mode" : ""}`}
+        aria-label="Home controls"
+        tabIndex={-1}
+      >
         {alertActive ? (
           <IncidentPanel
             onAcknowledge={acknowledgeAlert}
@@ -984,12 +1007,17 @@ export function HomeDashboard() {
       </aside>
 
       <nav className="mobile-nav" aria-label="Mobile navigation">
-        {navigation.slice(0, 5).map((item) => {
+        {mobileNavigation.map((item) => {
           const Icon = item.icon;
           return (
-            <button key={item.id} className={activeNav === item.id ? "is-active" : ""} onClick={() => chooseNavigation(item.id)}>
-              <Icon size={21} />
-              <span>{item.id}</span>
+            <button
+              key={item.id}
+              className={activeNav === item.id ? "is-active" : ""}
+              aria-current={activeNav === item.id ? "page" : undefined}
+              onClick={() => chooseNavigation(item.id)}
+            >
+              <Icon size={21} strokeWidth={1.8} aria-hidden="true" />
+              <span>{item.label}</span>
             </button>
           );
         })}
