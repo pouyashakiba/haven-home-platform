@@ -7,6 +7,7 @@ on:
 jobs:
   deploy:
     runs-on: self-hosted
+    timeout-minutes: 15
     steps:
       - name: Pull latest and restart services
         run: |
@@ -15,3 +16,6 @@ jobs:
           git pull --ff-only origin master
           docker compose build web gateway
           docker compose up -d web gateway
+          docker compose exec -T caddy caddy validate --config /etc/caddy/Caddyfile
+          docker compose restart caddy
+          docker compose ps
