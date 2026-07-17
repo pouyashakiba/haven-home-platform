@@ -1,4 +1,5 @@
 import type { Material, Object3D, Texture } from "three";
+import { createClientId } from "./client-id.ts";
 
 export type LocalHouseModel = {
   id: string;
@@ -60,7 +61,7 @@ export async function loadLocalHouseModel(file: File) {
     const footprint = Math.max(size.x, size.z, 0.001);
     const scale = MathUtils.clamp(11.2 / footprint, 0.02, 20);
     const model: LocalHouseModel = {
-      id: crypto.randomUUID(),
+      id: createClientId(),
       name: file.name.replace(/\.glb$/i, ""),
       scene,
       position: [-center.x * scale, -bounds.min.y * scale + 0.03, -center.z * scale],

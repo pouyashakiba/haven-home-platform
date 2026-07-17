@@ -1,7 +1,29 @@
 import assert from "node:assert/strict";
 import { File } from "node:buffer";
 import test from "node:test";
+import { createClientId } from "../app/lib/client-id.ts";
 import { loadLocalHouseModel, releaseLocalHouseModel } from "../app/lib/house-model.ts";
+
+const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+test("uses randomUUID when the browser provides it", () => {
+  const id = createClientId({ randomUUID: () => "native-id" });
+  assert.equal(id, "native-id");
+});
+
+test("creates a UUID-shaped ID when randomUUID is unavailable", () => {
+  const id = createClientId({
+    getRandomValues(bytes) {
+      bytes.fill(0x2a);
+      return bytes;
+    },
+  });
+  assert.match(id, UUID_V4_PATTERN);
+});
+
+test("creates a local fallback ID when Web Crypto is unavailable", () => {
+  assert.match(createClientId(null), UUID_V4_PATTERN);
+});
 
 function createTriangleGlb() {
   const positions = new Float32Array([

@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CommissioningPanel, type CommissioningMode } from "./CommissioningPanel";
+import { createClientId } from "../lib/client-id.ts";
 import { demoDevices, roomSummary, type DeviceKind, type HomeDevice } from "../lib/home-data";
 import {
   formatModelSize,
@@ -516,7 +517,7 @@ export function HomeDashboard() {
       return;
     }
     const room: SpatialRoom = {
-      id: `room-${crypto.randomUUID()}`,
+      id: `room-${createClientId()}`,
       name: commissioningMode.roomName,
       color: spatialRoomColors[spatialRooms.length % spatialRoomColors.length],
       points: commissioningMode.points,

@@ -1,4 +1,5 @@
 import type { AutomationAction } from "./automation-provider";
+import { createClientId } from "./client-id.ts";
 import type { HomeDevice } from "./home-data";
 
 export type RuntimeProviderStatus = "demo" | "connecting" | "online" | "stale" | "offline";
@@ -118,7 +119,7 @@ export async function sendGatewayAction(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      requestId: crypto.randomUUID(),
+      requestId: createClientId(),
       target: { entityId },
       action,
       parameters,
