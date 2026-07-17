@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { mutationIsTrusted } from "./request-trust.mjs";
 import { ScanStore } from "./scan-store.mjs";
 
 const port = Number(process.env.PORT || 8787);
@@ -46,20 +47,6 @@ function emit(type, payload) {
   eventBuffer.push(event);
   if (eventBuffer.length > 100) eventBuffer.shift();
   for (const response of subscribers) response.write(`id: ${event.seq}\ndata: ${message}\n\n`);
-}
-
-function mutationIsTrusted(request) {
-  if (!request.headers["content-type"]?.toLowerCase().startsWith("application/json")) return false;
-  if (mode === "live" && (!proxyKey || request.headers["x-haven-proxy-key"] !== proxyKey)) return false;
-
-  const origin = request.headers.origin;
-  const expectedHost = request.headers["x-forwarded-host"] || request.headers.host;
-  if (!origin || !expectedHost) return true;
-  try {
-    return new URL(origin).host === expectedHost;
-  } catch {
-    return false;
-  }
 }
 
 function readBody(request, maximumBytes = 64 * 1024) {
@@ -415,7 +402,7 @@ const server = createServer(async (request, response) => {
   }
   if (request.method === "POST" && url.pathname === "/api/v1/actions") {
     try {
-      if (!mutationIsTrusted(request)) return sendJson(response, 403, { error: "untrusted_request" });
+      if (!mutationIsTrusted(request, { mode, proxyKey })) return sendJson(response, 403, { error: "untrusted_request" });
       const action = await readBody(request);
       if (!action.requestId || !action.target || !action.action) return sendJson(response, 400, { error: "invalid_action" });
       if (commandResults.has(action.requestId)) return sendJson(response, 200, commandResults.get(action.requestId));
@@ -430,7 +417,7 @@ const server = createServer(async (request, response) => {
   }
   if (request.method === "POST" && url.pathname === "/api/v1/scans") {
     try {
-      if (!mutationIsTrusted(request)) return sendJson(response, 403, { error: "untrusted_request" });
+      if (!mutationIsTrusted(request, { mode, proxyKey })) return sendJson(response, 403, { error: "untrusted_request" });
       const body = await readBody(request);
       const session = await scanStore.createSession(body);
       return sendJson(response, 201, session);
